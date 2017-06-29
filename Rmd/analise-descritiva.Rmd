@@ -1,29 +1,42 @@
 ---
 title: "Análise descritiva dos dados do açude velho"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
 library(lubridate)
-library(ggplot2)
 library(reshape2)
 library(viridis)
 library(scales)
+library(zoo)
+
+knitr::opts_chunk$set(echo = F, message = F)
 
 #devtools::install_github("juliasilge/silgelib")
 library(silgelib)
 theme_set(theme_roboto())
 
-ajeitar.horario <- function(df) {
-  df %>%
+ajeitar.horario <- function(df, numerico = T) {
+  ndf <- df %>%
     mutate(horario.inicial = hm(as.character(horario.inicial))) %>%
     mutate(horario.final = hm(as.character(horario.final)))
+  if (!numerico)
+    return(ndf)
+  else
+    return(ndf %>%
+             mutate(horario.inicial = as.numeric(horario.inicial)) %>%
+             mutate(horario.final = as.numeric(horario.final))
+           )
 }
 
 carros <- read.csv('../dados/processados/carros.csv')
 ciclistas <- read.csv('../dados/processados/ciclistas.csv')
 motos <- read.csv('../dados/processados/motos.csv') 
-pedestres <- read.csv('../dados/processados/pedestres.csv')
+pedestres <- read.csv('../dados/processados/pedestres.csv') %>%
+  mutate(homem = total - mulher)
 modal.motorizado <- read.csv('../dados/processados/modal.motorizado.csv') 
 modal.sustentavel <- read.csv('../dados/processados/modal.sustentavel.csv')
 modais <- read.csv('../dados/processados/modais.csv')
@@ -35,6 +48,8 @@ modais.simples <- modais %>%
   mutate(tipo = ifelse(modal %in% c('ciclistas', 'pedestres'), 'sustentavel', 'motorizado'))
 
 ```
+
+
 # Quantidade de carros no açude velho ao longo do dia
 
 Interessante notar que a quantidade de carros que foram contados nos _burrinhos_ é assustadoramente maior que nos outros dois lugares. 
@@ -42,7 +57,7 @@ Interessante notar que a quantidade de carros que foram contados nos _burrinhos_
 ```{r}
 carros %>%
   ajeitar.horario() %>%
-  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  ggplot(aes(x = horario.inicial, y = total, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_color_brewer(type = 'qual') +
@@ -65,14 +80,14 @@ carros %>%
   mutate(percentagem = total / sum(total)) %>%
   mutate(label = paste0(as.character(round(100 * percentagem, 2)), '%')) %>%
   ggplot(aes(x = variable, y = percentagem, color = variable)) +
-  geom_bar(stat = 'identity', alpha = 0.9) +
+  geom_bar(stat = 'identity', alpha = 0.95) +
   geom_text(aes(x = variable,y = percentagem, label = label, color = variable), vjust=1.8) +
   scale_y_continuous(labels = percent_format(), breaks = seq(0, 1, 0.1)) +
   coord_trans(y="sqrt") +
   theme(legend.position = 'none') +
   labs(title = 'Proporção de veículos que passaram pelo açude',
        x = 'Veículo',
-       y = 'sqrt(Percentagem)')
+       y = 'Percentagem de veículos (sqrt)')
 
 ggsave('../graficos/proporcao-veiculos.png', height = 6, width = 6)
 ```
@@ -82,7 +97,7 @@ ggsave('../graficos/proporcao-veiculos.png', height = 6, width = 6)
 ```{r}
 pedestres %>%
   ajeitar.horario() %>%
-  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  ggplot(aes(x = horario.inicial, y = total, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_color_brewer(type = 'qual') +
@@ -94,6 +109,60 @@ pedestres %>%
 ggsave('../graficos/quantidade-pedestres.png', height = 6, width = 7.5)
 ```
 
+# Quem passou mais fora da faixa: homens ou mulheres?
+
+```{r, message=FALSE}
+pedestres %>%
+  filter(local == 'burrinhos') %>%
+  select(horario.inicial, horario.final, fora.da.faixa, mulher, homem) %>%
+  melt(var.ids = c('horario.inicial', 'horario.final'), variable.name = 'genero', value.name = 'fora.da.faixa') %>%
+  filter(genero != 'fora.da.faixa') %>%
+  ajeitar.horario(numerico = F) %>%
+  mutate(horario = ifelse(horario.inicial < hm('12:00'), 'Manhã', ifelse(horario.inicial < hm('18:00'), 'Tarde', 'Noite'))) %>%
+  mutate(horario = factor(horario, levels = c('Manhã', 'Tarde', 'Noite', ordered = T))) %>%
+  group_by(horario, genero) %>%
+  summarise(fora.da.faixa = sum(fora.da.faixa)) %>%
+  ungroup() %>%
+  group_by(horario) %>%
+  mutate(percentagem = fora.da.faixa / sum(fora.da.faixa)) %>%
+  mutate(label = paste0(as.character(round(100 * percentagem, 1)), '%')) %>%
+  mutate(genero = factor(genero, levels = c('mulher', 'homem'), labels = c('mulheres', 'homens'))) %>%
+  ggplot(aes(x = horario, y = percentagem, fill = genero)) +
+  geom_bar(stat = 'identity', position = 'stack') +
+  geom_text(aes(y = rep(c(0.8, 0.3), 3), label = label), color = 'white', alpha = 0.9, fontface = 'bold') +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = 'Quem passou mais fora da faixa?',
+       subtitle = 'Percentagem de homens e mulheres que atravessaram fora da faixa ao longo do dia',
+       x = 'Horário',
+       y = 'Percentagem',
+       fill = 'Gênero') +
+  coord_flip()
+
+ggsave('../graficos/quem-atravessou-fora-da-faixa.png', height = 5.5, width = 8.5)
+```
+
+# Qual é a hora de levar o cachorro pra passear?
+
+```{r}
+pedestres %>%
+  ajeitar.horario() %>%
+  mutate(horario.suave = rollmean(horario.inicial, 3, fill = 'extended')) %>%
+  group_by(local) %>%
+  mutate(percentagem = cachorro / sum(cachorro)) %>%
+  ggplot(aes(x = horario.suave, y = percentagem, color = local)) +
+  geom_smooth(se = F) +
+  scale_x_time() +
+  scale_y_continuous(labels = percent_format()) +
+  scale_color_brewer(type = 'qual') +
+  labs(title = 'Qual hora/lugar que havia cachorros passeando?',
+       subtitle = 'Distribuição de passeios com cachorros ao longo do dia em diferentes locais do açude',
+       color = 'Local',
+       x = 'Horário',
+       y = 'Percentagem')
+ggsave('../graficos/cachorros.png', height = 6, width = 7.5)
+  
+```
+
 
 # Quantidade de ciclistas no açude velho ao longo do dia
 
@@ -102,7 +171,7 @@ Interessante notar que a quantidade de carros que foram contados nos _burrinhos_
 ```{r}
 ciclistas %>%
   ajeitar.horario() %>%
-  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  ggplot(aes(x = horario.inicial, y = total, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_y_log10(breaks = c(1, 10, 100, 1000)) +
@@ -118,7 +187,7 @@ ggsave('../graficos/quantidade-ciclistas.png', height = 6, width = 7.5)
 ```{r}
 modais.simples %>%
   ajeitar.horario() %>%
-  ggplot(aes(x = as.numeric(horario.inicial), y = contagem, fill = modal)) +
+  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) +
   geom_bar(stat = 'identity', position = 'stack', alpha = 0.9) +
   scale_x_time() +
   scale_fill_brewer(type = 'qual', palette = 'Set2') +
