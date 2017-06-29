@@ -1,10 +1,9 @@
 
 library(dplyr)
 
-
 ajeita.formato <- function(df, primeiras.linhas = 0, ultimas.linhas = 0, primeiras.colunas = 0, ultimas.colunas = 0) {
   df %>%
-    rename(horario.inicial = X, horario.final = X.1) %>%
+    rename_(horario.inicial = names(.)[1], horario.final = names(.)[2]) %>%
     head(nrow(.)-ultimas.linhas) %>%
     tail(nrow(.)-primeiras.linhas) %>%
     select(., one_of(names(.[(primeiras.colunas+1):(ncol(.)-ultimas.colunas)]))) %>%
@@ -34,14 +33,16 @@ bobs.carros <- read.csv('dados/brutos/Contagens Açude Velho - Bob´s - Carros.c
 
 bobs.ciclistas <- read.csv('dados/brutos/Contagens Açude Velho - Bob´s - Ciclistas.csv') %>%
   ajeita.formato(ultimas.linhas = 2, ultimas.colunas = 1) %>%
-  mutate(calcada = NA) %>%
+  mutate(calcada = 0) %>%
   subset(select=c(horario.inicial:mulher, calcada, total))
 
 bobs.motos <- read.csv('dados/brutos/Contagens Açude Velho - Bob´s - Motos.csv') %>%
   ajeita.formato(ultimas.linhas = 1, ultimas.colunas = 1)
 
 bobs.pedestres <- read.csv('dados/brutos/Contagens Açude Velho - Bob´s - Pedestres.csv') %>%
-  ajeita.formato(ultimas.linhas = 2, ultimas.colunas = 1)
+  ajeita.formato(ultimas.linhas = 2, ultimas.colunas = 1) %>%
+  mutate(fora.da.faixa = 0) %>%
+  subset(select=c(horario.inicial:mulher, fora.da.faixa, cachorro:total))
 
 burrinhos.carros <- read.csv('dados/brutos/Contagens Açude Velho - Burrinhos - Carros.csv') %>%
   ajeita.formato(primeiras.linhas = 1, ultimas.linhas = 1, ultimas.colunas = 2) %>%
@@ -49,7 +50,7 @@ burrinhos.carros <- read.csv('dados/brutos/Contagens Açude Velho - Burrinhos - 
 
 burrinhos.ciclistas <- read.csv('dados/brutos/Contagens Açude Velho - Burrinhos - Ciclistas.csv') %>%
   ajeita.formato(primeiras.linhas = 1, ultimas.linhas = 1) %>%
-  rename(mulher = Mulher, calcada = Calçada)
+  rename(calcada = calçada)
 burrinhos.ciclistas[22,3:ncol(burrinhos.ciclistas)] <- 0
 
 burrinhos.motos <- read.csv('dados/brutos/Contagens Açude Velho - Burrinhos - Motos.csv') %>%
@@ -89,7 +90,7 @@ colunas.base <- c('horario.inicial', 'horario.final', 'total')
 colunas.carros <- c(colunas.base, 'caminhao', 'onibus')
 colunas.ciclistas <- c(colunas.base, 'mulher', 'calcada')
 colunas.motos <- colunas.base
-colunas.pedestres <- c(colunas.base, 'mulher', 'cachorro')
+colunas.pedestres <- c(colunas.base, 'mulher', 'fora.da.faixa', 'cachorro')
 
 
 # Vetores com os nomes das variáveis
@@ -98,7 +99,30 @@ nomes.colunas <- names(which(unlist(eapply(.GlobalEnv, is.character)))) %>%
 nomes.dfs <- names(which(unlist(eapply(.GlobalEnv, is.data.frame))))
 
 # Juntando dfs de vários locais para uma só categoria
-carros <- junta.dfs('carros')
+carros <- junta.dfs('carros') %>%
+  mutate(carros = total - onibus - caminhao)
 ciclistas <- junta.dfs('ciclistas')
 motos <- junta.dfs('motos')
 pedestres <- junta.dfs('pedestres')
+
+# Agrupando os modais
+modal.motorizado <- merge(carros, motos, by = c('horario.inicial', 'horario.final', 'local')) %>%
+  rename(veiculos = total.x, motos = total.y) %>%
+  mutate(total = veiculos + motos)
+
+modal.sustentavel <- merge(ciclistas, pedestres, by = c('horario.inicial', 'horario.final', 'local')) %>%
+  rename(mulheres.ciclistas = mulher.x, mulheres.pedestres = mulher.y, ciclistas = total.x, pedestres = total.y) %>%
+  mutate(total = ciclistas + pedestres)
+
+modais <- merge(modal.motorizado, modal.sustentavel, by = c('horario.inicial', 'horario.final', 'local')) %>%
+  rename(motorizados = total.x, sustentaveis = total.y)
+
+remove(colunas.base, colunas.carros, colunas.ciclistas, colunas.motos, colunas.pedestres, nomes.colunas, nomes.dfs)
+
+write.csv(carros, 'dados/processados/carros.csv', row.names = F)
+write.csv(ciclistas, 'dados/processados/ciclistas.csv', row.names = F)
+write.csv(motos, 'dados/processados/motos.csv', row.names = F)
+write.csv(pedestres, 'dados/processados/pedestres.csv', row.names = F)
+write.csv(modal.motorizado, 'dados/processados/modal.motorizado.csv', row.names = F)
+write.csv(modal.sustentavel, 'dados/processados/modal.sustentavel.csv', row.names = F)
+write.csv(modais, 'dados/processados/modais.csv', row.names = F)

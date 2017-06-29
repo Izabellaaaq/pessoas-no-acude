@@ -1,0 +1,133 @@
+---
+title: "Análise descritiva dos dados do açude velho"
+output: html_notebook
+---
+
+```{r}
+library(lubridate)
+library(ggplot2)
+library(reshape2)
+library(viridis)
+library(scales)
+
+#devtools::install_github("juliasilge/silgelib")
+library(silgelib)
+theme_set(theme_roboto())
+
+ajeitar.horario <- function(df) {
+  df %>%
+    mutate(horario.inicial = hm(as.character(horario.inicial))) %>%
+    mutate(horario.final = hm(as.character(horario.final)))
+}
+
+carros <- read.csv('../dados/processados/carros.csv')
+ciclistas <- read.csv('../dados/processados/ciclistas.csv')
+motos <- read.csv('../dados/processados/motos.csv') 
+pedestres <- read.csv('../dados/processados/pedestres.csv')
+modal.motorizado <- read.csv('../dados/processados/modal.motorizado.csv') 
+modal.sustentavel <- read.csv('../dados/processados/modal.sustentavel.csv')
+modais <- read.csv('../dados/processados/modais.csv')
+
+modais.simples <- modais %>%
+  select(horario.inicial, horario.final, local, carros, onibus, caminhao, motos, ciclistas, pedestres) %>%
+  melt(id.vars = c('horario.inicial', 'horario.final', 'local'), variable.name = 'modal', value.name = 'contagem') %>%
+  mutate(modal.agregado = ifelse(modal %in% c('carros', 'onibus', 'caminhao'), 'veiculo', modal)) %>%
+  mutate(tipo = ifelse(modal %in% c('ciclistas', 'pedestres'), 'sustentavel', 'motorizado'))
+
+```
+# Quantidade de carros no açude velho ao longo do dia
+
+Interessante notar que a quantidade de carros que foram contados nos _burrinhos_ é assustadoramente maior que nos outros dois lugares. 
+
+```{r}
+carros %>%
+  ajeitar.horario() %>%
+  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  geom_line(size = 1.1) +
+  scale_x_time() +
+  scale_color_brewer(type = 'qual') +
+  labs(title = 'Quantidade de veículos transitando ao redor do açude velho',
+       subtitle = 'Agregado de ônibus, caminhões e carros que passaram ao redor do açude ao longo do dia',
+       color = 'Local',
+       x = 'Horário',
+       y = 'Quantidade de carros')
+ggsave('../graficos/quantidade-veiculos.png', height = 6, width = 7.5)
+```
+
+# Proporção de carros, ônibus e caminhões
+```{r, message=FALSE}
+carros %>%
+  melt(var.ids = c('horario.inicial', 'horario.final', 'local')) %>%
+  ajeitar.horario() %>%
+  group_by(variable) %>%
+  summarise(total = sum(value)) %>%
+  filter(variable != 'total') %>%
+  mutate(percentagem = total / sum(total)) %>%
+  mutate(label = paste0(as.character(round(100 * percentagem, 2)), '%')) %>%
+  ggplot(aes(x = variable, y = percentagem, color = variable)) +
+  geom_bar(stat = 'identity', alpha = 0.9) +
+  geom_text(aes(x = variable,y = percentagem, label = label, color = variable), vjust=1.8) +
+  scale_y_continuous(labels = percent_format(), breaks = seq(0, 1, 0.1)) +
+  coord_trans(y="sqrt") +
+  theme(legend.position = 'none') +
+  labs(title = 'Proporção de veículos que passaram pelo açude',
+       x = 'Veículo',
+       y = 'sqrt(Percentagem)')
+
+ggsave('../graficos/proporcao-veiculos.png', height = 6, width = 6)
+```
+
+
+# Quantidade de pedestres no açude velho ao longo do dia
+```{r}
+pedestres %>%
+  ajeitar.horario() %>%
+  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  geom_line(size = 1.1) +
+  scale_x_time() +
+  scale_color_brewer(type = 'qual') +
+  labs(title = 'Quantidade de pedestres no açude velho',
+       subtitle = 'Dados coletados em locais conhecidos do açude ao longo do dia',
+       color = 'Local',
+       x = 'Horário',
+       y = 'Quantidade de pedestres')
+ggsave('../graficos/quantidade-pedestres.png', height = 6, width = 7.5)
+```
+
+
+# Quantidade de ciclistas no açude velho ao longo do dia
+
+Interessante notar que a quantidade de carros que foram contados nos _burrinhos_ é assustadoramente maior que nos outros dois lugares. 
+
+```{r}
+ciclistas %>%
+  ajeitar.horario() %>%
+  ggplot(aes(x = as.numeric(horario.inicial), y = total, color = local)) +
+  geom_line(size = 1.1) +
+  scale_x_time() +
+  scale_y_log10(breaks = c(1, 10, 100, 1000)) +
+  scale_color_brewer(type = 'qual') +
+  labs(title = 'Quantidade de ciclistas transitando ao redor do açude velho',
+       color = 'Local',
+       x = 'Horário',
+       y = 'Quantidade de ciclistas (log10)')
+ggsave('../graficos/quantidade-ciclistas.png', height = 6, width = 7.5)
+```
+
+# Contagem dos modais
+```{r}
+modais.simples %>%
+  ajeitar.horario() %>%
+  ggplot(aes(x = as.numeric(horario.inicial), y = contagem, fill = modal)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 0.9) +
+  scale_x_time() +
+  scale_fill_brewer(type = 'qual', palette = 'Set2') +
+  facet_wrap(~tipo) +
+  labs(title = 'Contagem de modais motorizados x sustentáveis',
+       subtitle = 'Modais que trafegaram ao redor do açude velho',
+       x = 'Horário',
+       y = 'Contagem de modais',
+       fill = 'Modal')
+ggsave('../graficos/contagem-modais.png', height = 6, width = 9.5)
+```
+
