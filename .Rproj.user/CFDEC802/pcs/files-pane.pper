@@ -1,0 +1,9 @@
+{
+    "path" : "~/Projetos/lab-rua/pessoas-no-acude/dados/brutos",
+    "sortOrder" : [
+        {
+            "ascending" : true,
+            "columnIndex" : 2
+        }
+    ]
+}
