@@ -79,9 +79,9 @@ carros %>%
   filter(variable != 'total') %>%
   mutate(percentagem = total / sum(total)) %>%
   mutate(label = paste0(as.character(round(100 * percentagem, 2)), '%')) %>%
-  ggplot(aes(x = variable, y = percentagem, color = variable)) +
-  geom_bar(stat = 'identity', alpha = 0.95) +
-  geom_text(aes(x = variable,y = percentagem, label = label, color = variable), vjust=1.8) +
+  ggplot(aes(x = variable, y = percentagem, fill = variable)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(x = variable,y = percentagem, label = label), color = "white", fontface = "bold", vjust=1.8) +
   scale_y_continuous(labels = percent_format(), breaks = seq(0, 1, 0.1)) +
   coord_trans(y="sqrt") +
   theme(legend.position = 'none') +
@@ -91,6 +91,26 @@ carros %>%
 
 ggsave('../graficos/proporcao-veiculos.png', height = 6, width = 6)
 ```
+
+
+```{r, message=FALSE}
+modal.motorizado %>%
+  group_by(horario.inicial, horario.final) %>%
+  summarise(onibus = sum(onibus), caminhoes = sum(caminhao), carros = sum(carros), motos = sum(motos)) %>%
+  melt(var.ids = c('horario.inicial', 'horario.final')) %>%
+  ajeitar.horario() %>%
+  select(-horario.final) %>%
+  rename(horario = horario.inicial) %>%
+  ggplot(aes(x = horario, y = value, color = variable)) +
+    geom_line(size = 1.1) +
+    scale_x_time() +
+    scale_y_log10() +
+    labs(title = "Veículos no açude ao longo do dia",
+         x = "Horário",
+         y = "Quantidade de veículos (log10)",
+         color = "Tipo de veículo")
+```
+
 
 
 # Quantidade de pedestres no açude velho ao longo do dia
@@ -109,37 +129,28 @@ pedestres %>%
 ggsave('../graficos/quantidade-pedestres.png', height = 6, width = 7.5)
 ```
 
-# Quem passou mais fora da faixa: homens ou mulheres?
+# Que horas tem mais homens ou mulheres no açude?
 
 ```{r, message=FALSE}
 pedestres %>%
-  filter(local == 'burrinhos') %>%
-  select(horario.inicial, horario.final, fora.da.faixa, mulher, homem) %>%
-  melt(var.ids = c('horario.inicial', 'horario.final'), variable.name = 'genero', value.name = 'fora.da.faixa') %>%
-  filter(genero != 'fora.da.faixa') %>%
-  ajeitar.horario(numerico = F) %>%
-  mutate(horario = ifelse(horario.inicial < hm('12:00'), 'Manhã', ifelse(horario.inicial < hm('18:00'), 'Tarde', 'Noite'))) %>%
-  mutate(horario = factor(horario, levels = c('Manhã', 'Tarde', 'Noite', ordered = T))) %>%
-  group_by(horario, genero) %>%
-  summarise(fora.da.faixa = sum(fora.da.faixa)) %>%
-  ungroup() %>%
-  group_by(horario) %>%
-  mutate(percentagem = fora.da.faixa / sum(fora.da.faixa)) %>%
-  mutate(label = paste0(as.character(round(100 * percentagem, 1)), '%')) %>%
-  mutate(genero = factor(genero, levels = c('mulher', 'homem'), labels = c('mulheres', 'homens'))) %>%
-  ggplot(aes(x = horario, y = percentagem, fill = genero)) +
-  geom_bar(stat = 'identity', position = 'stack') +
-  geom_text(aes(y = rep(c(0.8, 0.3), 3), label = label), color = 'white', alpha = 0.9, fontface = 'bold') +
-  scale_y_continuous(labels = percent_format()) +
-  labs(title = 'Quem passou mais fora da faixa?',
-       subtitle = 'Percentagem de homens e mulheres que atravessaram fora da faixa ao longo do dia',
-       x = 'Horário',
-       y = 'Percentagem',
-       fill = 'Gênero') +
-  coord_flip()
+  group_by(horario.inicial, horario.final) %>%
+  summarise(mulher = sum(mulher), homem = sum(homem)) %>%
+  melt(var.ids = c('horario.inicial', 'horario.final')) %>%
+  ajeitar.horario() %>%
+  select(-horario.final) %>%
+  rename(horario = horario.inicial) %>%
+  ggplot(aes(x = horario, y = value, color = variable)) +
+    geom_line(size = 1.1) +
+    scale_x_time() +
+    labs(title = "Homens e mulheres no açude ao longo do dia",
+         x = "Horário",
+         y = "Quantidade de pessoas",
+         color = "Gênero")
 
-ggsave('../graficos/quem-atravessou-fora-da-faixa.png', height = 5.5, width = 8.5)
+ggsave('../graficos/genero-por-horario.png', height = 5.5, width = 8.5)
 ```
+
+
 
 # Qual é a hora de levar o cachorro pra passear?
 
