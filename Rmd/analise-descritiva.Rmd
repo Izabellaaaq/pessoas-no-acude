@@ -211,3 +211,54 @@ modais.simples %>%
 ggsave('../graficos/contagem-modais.png', height = 6, width = 9.5)
 ```
 
+```{r}
+modais.simples %>%
+  ajeitar.horario() %>%
+  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
+  filter(local == 'burrinhos')  %>%
+  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
+  streamgraph('modal', 'contagem', 'horario.inicial', scale = 'continuous') %>%
+  sg_fill_brewer(palette = "Dark2") %>%
+  sg_axis_x(tick_units = 'hour', tick_format = '%H')
+```
+
+```{r}
+modais.simples %>%
+  ajeitar.horario() %>%
+  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
+  filter(local == 'burrinhos')  %>%
+  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
+  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
+  scale_fill_brewer(palette = 'Set2') +
+  scale_x_time() +
+  labs(title = 'Modais ao longo do dia nos burrinhos', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
+ggsave('../graficos/contagem-modais-burrinhos.png', height = 6, width = 9.5)
+```
+
+```{r}
+modais.simples %>%
+  ajeitar.horario() %>%
+  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
+  filter(local == 'bobs')  %>%
+  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
+  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
+  scale_fill_brewer(palette = 'Set2') +
+  scale_x_time() +
+  labs(title = 'Modais ao longo do dia no bobs', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
+ggsave('../graficos/contagem-modais-bobs.png', height = 6, width = 9.5)
+```
+
+
+```{r}
+modais.simples %>%
+  ajeitar.horario() %>%
+  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
+  filter(local == 'jackson')  %>%
+  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
+  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
+  scale_fill_brewer(palette = 'Set2') +
+  scale_x_time() +
+  labs(title = 'Modais ao longo do dia em jackson', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
+ggsave('../graficos/contagem-modais-jackson.png', height = 6, width = 9.5)
+```
+
