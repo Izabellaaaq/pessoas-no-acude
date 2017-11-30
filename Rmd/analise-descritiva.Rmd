@@ -19,33 +19,20 @@ knitr::opts_chunk$set(echo = F, message = F)
 library(silgelib)
 theme_set(theme_roboto())
 
-ajeitar.horario <- function(df, numerico = T) {
+ajeitar_horario <- function(df, numerico = T) {
   ndf <- df %>%
-    mutate(horario.inicial = hm(as.character(horario.inicial))) %>%
-    mutate(horario.final = hm(as.character(horario.final)))
+    mutate(horario_inicial = hm(as.character(horario_inicial))) %>%
+    mutate(horario_final = hm(as.character(horario_final)))
   if (!numerico)
     return(ndf)
   else
     return(ndf %>%
-             mutate(horario.inicial = as.numeric(horario.inicial)) %>%
-             mutate(horario.final = as.numeric(horario.final))
+             mutate(horario_inicial = as.numeric(horario_inicial)) %>%
+             mutate(horario_final = as.numeric(horario_final))
            )
 }
 
-carros <- read.csv('../dados/processados/carros.csv')
-ciclistas <- read.csv('../dados/processados/ciclistas.csv')
-motos <- read.csv('../dados/processados/motos.csv') 
-pedestres <- read.csv('../dados/processados/pedestres.csv') %>%
-  mutate(homem = total - mulher)
-modal.motorizado <- read.csv('../dados/processados/modal.motorizado.csv') 
-modal.sustentavel <- read.csv('../dados/processados/modal.sustentavel.csv')
-modais <- read.csv('../dados/processados/modais.csv')
-
-modais.simples <- modais %>%
-  select(horario.inicial, horario.final, local, carros, onibus, caminhao, motos, ciclistas, pedestres) %>%
-  melt(id.vars = c('horario.inicial', 'horario.final', 'local'), variable.name = 'modal', value.name = 'contagem') %>%
-  mutate(modal.agregado = ifelse(modal %in% c('carros', 'onibus', 'caminhao'), 'veiculo', modal)) %>%
-  mutate(tipo = ifelse(modal %in% c('ciclistas', 'pedestres'), 'sustentavel', 'motorizado'))
+dados <- read.csv('../dados/processados/dados.csv')
 
 ```
 
@@ -55,9 +42,9 @@ modais.simples <- modais %>%
 Interessante notar que a quantidade de carros que foram contados nos _burrinhos_ é assustadoramente maior que nos outros dois lugares. 
 
 ```{r}
-carros %>%
-  ajeitar.horario() %>%
-  ggplot(aes(x = horario.inicial, y = total, color = local)) +
+dados %>%
+  ajeitar_horario() %>%
+  ggplot(aes(x = horario_inicial, y = carros, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_color_brewer(type = 'qual') +
@@ -71,9 +58,10 @@ ggsave('../graficos/quantidade-veiculos.png', height = 6, width = 7.5)
 
 # Proporção de carros, ônibus e caminhões
 ```{r, message=FALSE}
-carros %>%
-  melt(var.ids = c('horario.inicial', 'horario.final', 'local')) %>%
-  ajeitar.horario() %>%
+dados %>%
+  select(horario_inicial, horario_final, local, carros, onibus, caminhoes) %>%
+  melt(var.ids = c('horario_inicial', 'horario_final', 'local')) %>%
+  ajeitar_horario() %>%
   group_by(variable) %>%
   summarise(total = sum(value)) %>%
   filter(variable != 'total') %>%
@@ -94,13 +82,14 @@ ggsave('../graficos/proporcao-veiculos.png', height = 6, width = 6)
 
 
 ```{r, message=FALSE}
-modal.motorizado %>%
-  group_by(horario.inicial, horario.final) %>%
-  summarise(onibus = sum(onibus), caminhoes = sum(caminhao), carros = sum(carros), motos = sum(motos)) %>%
-  melt(var.ids = c('horario.inicial', 'horario.final')) %>%
-  ajeitar.horario() %>%
-  select(-horario.final) %>%
-  rename(horario = horario.inicial) %>%
+dados %>%
+  select(horario_inicial, horario_final, local, carros, motos, onibus, caminhoes) %>%
+  group_by(horario_inicial, horario_final) %>%
+  summarise(onibus = sum(onibus), caminhoes = sum(caminhoes), carros = sum(carros), motos = sum(motos)) %>%
+  melt(var.ids = c('horario_inicial', 'horario_final')) %>%
+  ajeitar_horario() %>%
+  select(-horario_final) %>%
+  rename(horario = horario_inicial) %>%
   ggplot(aes(x = horario, y = value, color = variable)) +
     geom_line(size = 1.1) +
     scale_x_time() +
@@ -115,9 +104,10 @@ modal.motorizado %>%
 
 # Quantidade de pedestres no açude velho ao longo do dia
 ```{r}
-pedestres %>%
-  ajeitar.horario() %>%
-  ggplot(aes(x = horario.inicial, y = total, color = local)) +
+dados %>%
+  select(horario_inicial, horario_final, local, total_pedestres) %>%
+  ajeitar_horario() %>%
+  ggplot(aes(x = horario_inicial, y = total_pedestres, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_color_brewer(type = 'qual') +
@@ -132,13 +122,14 @@ ggsave('../graficos/quantidade-pedestres.png', height = 6, width = 7.5)
 # Que horas tem mais homens ou mulheres no açude?
 
 ```{r, message=FALSE}
-pedestres %>%
-  group_by(horario.inicial, horario.final) %>%
-  summarise(mulher = sum(mulher), homem = sum(homem)) %>%
-  melt(var.ids = c('horario.inicial', 'horario.final')) %>%
-  ajeitar.horario() %>%
-  select(-horario.final) %>%
-  rename(horario = horario.inicial) %>%
+dados %>%
+  select(horario_inicial, horario_final, local, mulheres_pedestres, homens_pedestres) %>%
+  group_by(horario_inicial, horario_final) %>%
+  summarise(mulher = sum(mulheres_pedestres), homem = sum(homens_pedestres)) %>%
+  melt(var.ids = c('horario_inicial', 'horario_final')) %>%
+  ajeitar_horario() %>%
+  select(-horario_final) %>%
+  rename(horario = horario_inicial) %>%
   ggplot(aes(x = horario, y = value, color = variable)) +
     geom_line(size = 1.1) +
     scale_x_time() +
@@ -154,13 +145,14 @@ ggsave('../graficos/genero-por-horario.png', height = 5.5, width = 8.5)
 
 # Qual é a hora de levar o cachorro pra passear?
 
-```{r}
-pedestres %>%
-  ajeitar.horario() %>%
-  mutate(horario.suave = rollmean(horario.inicial, 3, fill = 'extended')) %>%
+```{r, warning=FALSE}
+dados %>%
+  select(horario_inicial, horario_final, local, pedestres_com_cachorro) %>%
+  ajeitar_horario() %>%
+  mutate(horario_suave = rollmean(horario_inicial, 3, fill = 'extended')) %>%
   group_by(local) %>%
-  mutate(percentagem = cachorro / sum(cachorro)) %>%
-  ggplot(aes(x = horario.suave, y = percentagem, color = local)) +
+  mutate(percentagem = pedestres_com_cachorro / sum(pedestres_com_cachorro)) %>%
+  ggplot(aes(x = horario_suave, y = percentagem, color = local)) +
   geom_smooth(se = F) +
   scale_x_time() +
   scale_y_continuous(labels = percent_format()) +
@@ -180,9 +172,10 @@ ggsave('../graficos/cachorros.png', height = 6, width = 7.5)
 Interessante notar que a quantidade de carros que foram contados nos _burrinhos_ é assustadoramente maior que nos outros dois lugares. 
 
 ```{r}
-ciclistas %>%
-  ajeitar.horario() %>%
-  ggplot(aes(x = horario.inicial, y = total, color = local)) +
+dados %>%
+  select(horario_inicial, horario_final, local, total_ciclistas) %>%
+  ajeitar_horario() %>%
+  ggplot(aes(x = horario_inicial, y = total_ciclistas, color = local)) +
   geom_line(size = 1.1) +
   scale_x_time() +
   scale_y_log10(breaks = c(1, 10, 100, 1000)) +
@@ -194,71 +187,4 @@ ciclistas %>%
 ggsave('../graficos/quantidade-ciclistas.png', height = 6, width = 7.5)
 ```
 
-# Contagem dos modais
-```{r}
-modais.simples %>%
-  ajeitar.horario() %>%
-  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) +
-  geom_bar(stat = 'identity', position = 'stack', alpha = 0.9) +
-  scale_x_time() +
-  scale_fill_brewer(type = 'qual', palette = 'Set2') +
-  facet_wrap(~tipo) +
-  labs(title = 'Contagem de modais motorizados x sustentáveis',
-       subtitle = 'Modais que trafegaram ao redor do açude velho',
-       x = 'Horário',
-       y = 'Contagem de modais',
-       fill = 'Modal')
-ggsave('../graficos/contagem-modais.png', height = 6, width = 9.5)
-```
-
-```{r}
-modais.simples %>%
-  ajeitar.horario() %>%
-  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
-  filter(local == 'burrinhos')  %>%
-  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
-  streamgraph('modal', 'contagem', 'horario.inicial', scale = 'continuous') %>%
-  sg_fill_brewer(palette = "Dark2") %>%
-  sg_axis_x(tick_units = 'hour', tick_format = '%H')
-```
-
-```{r}
-modais.simples %>%
-  ajeitar.horario() %>%
-  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
-  filter(local == 'burrinhos')  %>%
-  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
-  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
-  scale_fill_brewer(palette = 'Set2') +
-  scale_x_time() +
-  labs(title = 'Modais ao longo do dia nos burrinhos', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
-ggsave('../graficos/contagem-modais-burrinhos.png', height = 6, width = 9.5)
-```
-
-```{r}
-modais.simples %>%
-  ajeitar.horario() %>%
-  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
-  filter(local == 'bobs')  %>%
-  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
-  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
-  scale_fill_brewer(palette = 'Set2') +
-  scale_x_time() +
-  labs(title = 'Modais ao longo do dia no bobs', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
-ggsave('../graficos/contagem-modais-bobs.png', height = 6, width = 9.5)
-```
-
-
-```{r}
-modais.simples %>%
-  ajeitar.horario() %>%
-  filter(is.element(modal, c('carros', 'motos', 'ciclistas', 'pedestres'))) %>%
-  filter(local == 'jackson')  %>%
-  mutate(modal = factor(modal, levels = c('carros', 'motos', 'pedestres', 'ciclistas'), ordered = T)) %>%
-  ggplot(aes(x = horario.inicial, y = contagem, fill = modal)) + geom_area() +
-  scale_fill_brewer(palette = 'Set2') +
-  scale_x_time() +
-  labs(title = 'Modais ao longo do dia em jackson', x = 'Horário', y = 'Contagem', fill = 'Tipo de modal')
-ggsave('../graficos/contagem-modais-jackson.png', height = 6, width = 9.5)
-```
 

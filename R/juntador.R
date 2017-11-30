@@ -1,5 +1,8 @@
 
-library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(zoo)
 
 ajeita.formato <- function(df, primeiras.linhas = 0, ultimas.linhas = 0, primeiras.colunas = 0, ultimas.colunas = 0) {
   df %>%
@@ -117,6 +120,7 @@ modal.sustentavel <- merge(ciclistas, pedestres, by = c('horario.inicial', 'hora
 modais <- merge(modal.motorizado, modal.sustentavel, by = c('horario.inicial', 'horario.final', 'local')) %>%
   rename(motorizados = total.x, sustentaveis = total.y)
 
+
 remove(colunas.base, colunas.carros, colunas.ciclistas, colunas.motos, colunas.pedestres, nomes.colunas, nomes.dfs)
 
 write.csv(carros, 'dados/processados/carros.csv', row.names = F)
@@ -126,3 +130,21 @@ write.csv(pedestres, 'dados/processados/pedestres.csv', row.names = F)
 write.csv(modal.motorizado, 'dados/processados/modal.motorizado.csv', row.names = F)
 write.csv(modal.sustentavel, 'dados/processados/modal.sustentavel.csv', row.names = F)
 write.csv(modais, 'dados/processados/modais.csv', row.names = F)
+
+modais <- read.csv('dados/processados/modais.csv')
+
+dados <- modais %>%
+  select(-veiculos, -fora.da.faixa, -sustentaveis, -motorizados, -calcada) %>%
+  rename(caminhoes = caminhao, pedestres_com_cachorro = cachorro, mulheres_pedestres = mulheres.pedestres,
+         mulheres_ciclistas = mulheres.ciclistas, horario_inicial = horario.inicial,
+         horario_final = horario.final, total_pedestres = pedestres, total_ciclistas = ciclistas) %>%
+  mutate(homens_ciclistas = total_ciclistas - mulheres_ciclistas,
+         homens_pedestres = total_pedestres - mulheres_pedestres,
+         total_motorizados = carros + motos + onibus + caminhoes,
+         pedestres_sem_cachorro = total_pedestres - pedestres_com_cachorro) %>%
+  select(horario_inicial, horario_final, local, carros, motos, onibus, caminhoes, total_motorizados,
+         mulheres_ciclistas, homens_ciclistas, total_ciclistas, mulheres_pedestres, homens_pedestres,
+         total_pedestres, pedestres_com_cachorro, pedestres_sem_cachorro)
+
+
+write.csv(dados, 'dados/processados/dados.csv', row.names = F)
